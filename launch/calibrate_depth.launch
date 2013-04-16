@@ -1,0 +1,16 @@
+<launch>
+  <arg name="camera" />
+
+  <group ns="$(arg camera)/driver">
+    <param name="z_offset_mm" value="0"/>
+    <param name="z_scaling" value="1.0"/>
+  </group>
+
+  <node name="calibrator" pkg="rgbd_camera_calibration" type="rgbd_depth_calibrator" output="screen">
+    <remap from="image" to="$(arg camera)/rgb/image_rect" />
+    <remap from="depth" to="$(arg camera)/depth_registered/image_rect" />
+    <remap from="camera_info" to="$(arg camera)/rgb/camera_info" />
+  </node>
+
+</launch>
+

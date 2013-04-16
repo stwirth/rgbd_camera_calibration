@@ -41,8 +41,6 @@
 
 #include <ros/console.h>
 #include <ros/ros.h>
-#include <image_cb_detector/image_cb_detector.h>
-#include <image_cb_detector/depth_to_pointcloud.h>
 
 #include <image_geometry/pinhole_camera_model.h>
 #include <sensor_msgs/Image.h>

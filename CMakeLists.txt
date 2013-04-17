@@ -4,7 +4,7 @@ project(rgbd_camera_calibration)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp pcl pcl_ros image_geometry cv_bridge)
+find_package(catkin REQUIRED COMPONENTS roscpp pcl pcl_ros image_geometry cv_bridge dynamic_reconfigure)
 
 find_package(OpenCV REQUIRED)
 
@@ -37,6 +37,8 @@ find_package(OpenCV REQUIRED)
 #   std_msgs  # Or other packages containing msgs
 # )
 
+generate_dynamic_reconfigure_options(cfg/BlobDetector.cfg)
+
 ###################################
 ## catkin specific configuration ##
 ###################################
@@ -65,7 +67,13 @@ include_directories(include
 
 add_library(pattern_detection
   src/checkerboard_detector.cpp
+  src/circles_grid_detector.cpp
 )
+target_link_libraries(pattern_detection
+  ${catkin_LIBRARIES}
+)
+
+add_dependencies(pattern_detection rgbd_camera_calibration_gencfg) 
 
 add_executable(rgbd_depth_calibrator src/rgbd_depth_calibrator.cpp)
 
@@ -74,9 +82,9 @@ add_executable(rgbd_depth_calibrator src/rgbd_depth_calibrator.cpp)
 # add_dependencies(rgbd_camera_calibration_node rgbd_camera_calibration_generate_messages_cpp)
 
 target_link_libraries(rgbd_depth_calibrator
+  pattern_detection
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
-  pattern_detection
 )
 
 #############

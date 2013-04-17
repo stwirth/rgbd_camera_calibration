@@ -267,7 +267,7 @@ public:
 private:
   ros::NodeHandle nh_;
   ros::NodeHandle nh_priv_;
-  rgbd_camera_calibration::CheckerboardDetector* detector_;
+  rgbd_camera_calibration::PatternDetector* detector_;
 
   message_filters::Subscriber<sensor_msgs::Image> image_sub_; 
   message_filters::Subscriber<sensor_msgs::Image> depth_sub_;

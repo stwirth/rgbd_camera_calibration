@@ -34,69 +34,40 @@
 
 //! \author Stephan Wirth
 
-#ifndef RGBD_CAMERA_CALIBRATION_CHECKERBOARD_DETECTOR_H_
-#define RGBD_CAMERA_CALIBRATION_CHECKERBOARD_DETECTOR_H_
+#ifndef RGBD_CAMERA_CALIBRATION_PATTERN_DETECTOR_H_
+#define RGBD_CAMERA_CALIBRATION_PATTERN_DETECTOR_H_
 
-#include <ros/ros.h>
-#include "rgbd_camera_calibration/pattern_detector.h"
+#include <sensor_msgs/Image.h>
+#include <opencv2/core/core.hpp>
 
 namespace rgbd_camera_calibration
 {
 
 /**
- * Implements a checkerboard detector using OpenCV.
- * The input is an image, the output is the set of 2D pattern points.
+ * Abstract base class for pattern detectors.
  */
-class CheckerboardDetector : public PatternDetector
+class PatternDetector
 {
 public:
 
-  /**
-   * Creates a detector with all parameters read from
-   * given node handle. See implementation or private section
-   * for a the list of parameters.
-   */
-  CheckerboardDetector(ros::NodeHandle& nh);
+  virtual ~PatternDetector() {}
 
   /**
-   * Detect the checkerboard on given image.
+   * Detect the pattern points on given image.
    * @param[in] image input image
-   * @param[out] corners the image points of the checkerboard corners.
-   * @return true if checkerboard has been found, false otherwise.
+   * @param[out] points the pattern points.
+   * @return true if pattern has been found, false otherwise.
    */
   virtual bool detect(
       const sensor_msgs::ImageConstPtr& image,
-      std::vector<cv::Point2f>& corners) const;
-
-  inline int getNumRows() const
-  {
-    return num_rows_;
-  }
-
-  inline int getNumCols() const
-  {
-    return num_cols_;
-  }
+      std::vector<cv::Point2f>& points) const = 0;
 
   /**
    * @return Ideal world coordinates of the points that this
    *         detector detects.
    */
-  virtual std::vector<cv::Point3f> getIdealWorldPoints() const
-  {
-    return corners3d_;
-  }
+  virtual std::vector<cv::Point3f> getIdealWorldPoints() const = 0;
 
-private:
-
-  int num_rows_;
-  int num_cols_;
-  double square_size_;
-
-  int subpixel_window_size_;
-  int subpixel_zero_zone_;
-
-  std::vector<cv::Point3f> corners3d_;
 };
 
 }

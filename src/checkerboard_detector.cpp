@@ -47,6 +47,7 @@ rgbd_camera_calibration::CheckerboardDetector::CheckerboardDetector(
   nh.param("num_cols", num_cols_, 7);
   nh.param("square_size", square_size_, 0.108);
   nh.param("subpixel_window_size", subpixel_window_size_, 11);
+  nh.param("subpixel_zero_zone", subpixel_zero_zone_, -1);
 
   // compute ideal 3D points
   double width = (num_cols_ - 1) * square_size_;

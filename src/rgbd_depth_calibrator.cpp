@@ -96,14 +96,19 @@ public:
     int num_samples;
     nh_priv_.param("num_samples", num_samples, 100);
     sample_bins_.resize(num_samples, 0);
-    cv::namedWindow(WINDOW_NAME, CV_WINDOW_NORMAL);
+    nh_priv_.param("show_image", show_image_, false);
+    if (show_image_)
+    {
+      cv::namedWindow(WINDOW_NAME, CV_WINDOW_NORMAL);
+    }
   }
 
   ~RgbdDepthCalibrator()
   {
     if (has_log_)
       log_.close();
-    cv::destroyWindow(WINDOW_NAME);
+    if (show_image_);
+      cv::destroyWindow(WINDOW_NAME);
     delete detector_;
 
     std::ofstream out("camera_info/rgbd_depth_params.yaml");
@@ -255,8 +260,11 @@ public:
     bool copy_data = false;
     cv::Mat_<unsigned char> sample_bin_image(sample_bins_, copy_data);
     sample_bin_image.reshape(0, 1);
-    cv::imshow(WINDOW_NAME, sample_bin_image);
-    cv::waitKey(5);
+    if (show_image_)
+    {
+      cv::imshow(WINDOW_NAME, sample_bin_image);
+      cv::waitKey(5);
+    }
   }
 
   inline bool isFinished() const
@@ -293,6 +301,8 @@ private:
 
   double scaling_;
   double offset_;
+
+  bool show_image_;
 
 };
 

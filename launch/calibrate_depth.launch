@@ -8,8 +8,7 @@
 
   <node name="calibrator" pkg="rgbd_camera_calibration" type="rgbd_depth_calibrator" output="screen">
     <remap from="image" to="$(arg camera)/rgb/image_rect" />
-    <remap from="depth" to="$(arg camera)/depth_registered/image_rect" />
-    <remap from="camera_info" to="$(arg camera)/rgb/camera_info" />
+    <remap from="depth_image" to="$(arg camera)/depth_registered/image_rect" />
   </node>
 
 </launch>

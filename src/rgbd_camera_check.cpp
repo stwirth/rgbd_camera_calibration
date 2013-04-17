@@ -48,81 +48,67 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
 
+#include <cv_bridge/cv_bridge.h>
+
 #include "rgbd_camera_calibration/rgbd_processor.h"
-#include "rgbd_camera_calibration/checkerboard_detector.h"
+#include "rgbd_camera_calibration/circles_grid_detector.h"
 
 static const std::string WINDOW_NAME = "Depth Calibration";
-
 
 namespace rgbd_camera_calibration
 {
 
-class RgbdDepthCalibrator : public RgbdProcessor
+class RgbdCameraCheck : public RgbdProcessor
 {
 public:
-  RgbdDepthCalibrator(ros::NodeHandle& n) : RgbdProcessor(n),
+  RgbdCameraCheck(ros::NodeHandle & n) : RgbdProcessor(n),
     nh_(n),
-    nh_priv_("~"),
-    finished_(false)
+    nh_priv_("~")
   {
-    rgb_points_pub_ = nh_.advertise<pcl::PointCloud<pcl::PointXYZ> >("rgb_checkerboard_points", 1);
-    depth_points_pub_ = nh_.advertise<pcl::PointCloud<pcl::PointXYZ> >("depth_checkerboard_points", 1);
-
-    detector_ = new rgbd_camera_calibration::CheckerboardDetector(nh_priv_);
-
-    std::string logfile_name;
-    nh_priv_.param("logfile", logfile_name, std::string(""));
-    if (logfile_name != "")
-    {
-      has_log_ = true;
-      log_.open(logfile_name.c_str());
-      log_ << "# rgb_z depth_z" << std::endl;
-    }
-
-    nh_priv_.param("min_z", min_z_, 0.0);
-    nh_priv_.param("max_z", max_z_, 3.5);
-    int num_samples;
-    nh_priv_.param("num_samples", num_samples, 100);
-    sample_bins_.resize(num_samples, 0);
-    nh_priv_.param("show_image", show_image_, false);
-    if (show_image_)
-    {
-      cv::namedWindow(WINDOW_NAME, CV_WINDOW_NORMAL);
-    }
+    ros::NodeHandle rgb_detector_nh(nh_priv_, "rgb_detector");
+    rgb_detector_ = 
+      new rgbd_camera_calibration::CirclesGridDetector(rgb_detector_nh);
+    ros::NodeHandle depth_detector_nh(nh_priv_, "depth_detector");
+    depth_detector_ = 
+      new rgbd_camera_calibration::CirclesGridDetector(depth_detector_nh);
+    cv::namedWindow(WINDOW_NAME, CV_WINDOW_NORMAL);
   }
 
-  ~RgbdDepthCalibrator()
+  ~RgbdCameraCheck()
   {
-    if (has_log_)
-      log_.close();
-    if (show_image_);
-      cv::destroyWindow(WINDOW_NAME);
-    delete detector_;
-
-    std::ofstream out("camera_info/rgbd_depth_params.yaml");
-    out << "z_offset_mm: " << offset_ * 1000 << std::endl;
-    out << "z_scaling: " << scaling_ << std::endl;
-    out.close();
+    cv::destroyWindow(WINDOW_NAME);
+    delete rgb_detector_;
+    delete depth_detector_;
   }
 
   void imageCallback(const sensor_msgs::ImageConstPtr& image_msg,
                      const sensor_msgs::ImageConstPtr& depth_msg,
-                     const sensor_msgs::CameraInfoConstPtr& caminfo_msg,
-                     const sensor_msgs::CameraInfoConstPtr& /*depth_info_msg*/)
+                     const sensor_msgs::CameraInfoConstPtr& rgb_info_msg,
+                     const sensor_msgs::CameraInfoConstPtr& depth_info_msg)
   {
     // update camera model
-    camera_model_.fromCameraInfo(caminfo_msg);
+    rgb_camera_model_.fromCameraInfo(rgb_info_msg);
+    depth_camera_model_.fromCameraInfo(depth_info_msg);
 
-    // detect checkerboard corners
-    std::vector<cv::Point2f> corners;
-    bool detected = detector_->detect(image_msg, corners);
+    // detect circles
+    std::vector<cv::Point2f> centers;
+    bool detected = depth_detector_->detect(depth_msg, centers);
     if (!detected)
     {
-      ROS_WARN_THROTTLE(2.0, "No calibration pattern detected.");
-      return;
+      ROS_WARN_THROTTLE(2.0, "No pattern detected.");
     }
 
-    // find 3D checkerboard pose
+    cv::Mat depth_image = cv_bridge::toCvShare(depth_msg)->image;
+    cv::drawChessboardCorners(
+        depth_image, 
+        cv::Size(depth_detector_->getNumCols(), depth_detector_->getNumRows()), 
+        centers, detected);
+    cv::imshow(WINDOW_NAME, depth_image);
+    cv::waitKey(5);
+
+    /*
+
+    // find 3D pattern pose
     const cv::Mat P(3,4, CV_64FC1, const_cast<double*>(caminfo_msg->P.data()));
     // We have to take K' here extracted from P to take the R|t into account
     // that was performed during rectification.
@@ -142,19 +128,22 @@ public:
     tf::Vector3 translation(
         t_vec.at<double>(0, 0), t_vec.at<double>(1, 0), t_vec.at<double>(2, 0));
     tf::Transform transform(quaternion, translation);
-    // compute checkerboard corners point cloud
-    pcl::PointCloud<pcl::PointXYZ> rgb_corner_cloud;
+    // compute pattern point cloud
+    pcl::PointCloud<pcl::PointXYZ> rgb_point_cloud;
     for (size_t i = 0; i < object_points.size(); ++i)
     {
       pcl::PointXYZ point;
       point.x = object_points[i].x;
       point.y = object_points[i].y;
       point.z = object_points[i].z;
-      rgb_corner_cloud.push_back(point);
+      rgb_point_cloud.push_back(point);
     }
-    pcl_ros::transformPointCloud(rgb_corner_cloud, rgb_corner_cloud, transform);
+    pcl_ros::transformPointCloud(rgb_point_cloud, rgb_point_cloud, transform);
 
-    // compute checkerboard corners from depth image
+    */
+
+    /*
+    // detect corners from depth image
     const float* depth_ptr = reinterpret_cast<const float*>(&depth_msg->data[0]);
     std::size_t width = depth_msg->width;
     std::size_t height = depth_msg->height;
@@ -177,6 +166,7 @@ public:
       depth_point.z = scale * ray.z;
       depth_corner_cloud.push_back(depth_point);
     }
+    */
     /*
       const pcl::PointXYZ rgb_point = rgb_corner_cloud.points[i];
       cv::Point3d checkerboard_corner(rgb_point.x, rgb_point.y, rgb_point.z);
@@ -194,113 +184,37 @@ public:
           << pixel.x << " " << pixel.y << " " << reprojection_error << std::endl;
       }
       */
+    /*
     ROS_ASSERT(rgb_corner_cloud.size() == depth_corner_cloud.size());
     
     rgb_corner_cloud.header = image_msg->header;
     depth_corner_cloud.header = depth_msg->header;
     rgb_points_pub_.publish(rgb_corner_cloud);
     depth_points_pub_.publish(depth_corner_cloud);
-
-    double sum_rgb_z = 0.0;
-    double sum_depth_z = 0.0;
-    for (size_t i = 0; i < rgb_corner_cloud.points.size(); ++i)
-    {
-      sum_rgb_z += rgb_corner_cloud.at(i).z;
-      sum_depth_z += depth_corner_cloud.at(i).z;
-    }
-    double rgb_z = sum_rgb_z / rgb_corner_cloud.size();
-    double depth_z = sum_depth_z / rgb_corner_cloud.size();
-    if (rgb_z <= max_z_ && rgb_z >= min_z_)
-    {
-      int bin_index = static_cast<int>(
-            (sample_bins_.size() - 1) * (rgb_z - min_z_) / (max_z_ - min_z_));
-      if (sample_bins_[bin_index] == 0)
-      {
-        samples_.push_back(std::make_pair(depth_z, rgb_z));
-        sample_bins_[bin_index] = 255;
-        if (has_log_)
-        {
-          log_ << rgb_z << " " << depth_z << std::endl;
-        }
-      }
-    }
-    if (samples_.size() > 1)
-    {
-      // line fitting
-      double x_sq_sum = 0.0;
-      double y_sq_sum = 0.0;
-      double xy_sum = 0.0;
-      double x_sum = 0.0;
-      double y_sum = 0.0;
-      for (size_t i = 0; i < samples_.size(); ++i)
-      {
-        x_sq_sum += samples_[i].first * samples_[i].first;
-        y_sq_sum += samples_[i].second * samples_[i].second;
-        xy_sum += samples_[i].first * samples_[i].second;
-        x_sum += samples_[i].first;
-        y_sum += samples_[i].second;
-      }
-      double d = samples_.size()*x_sq_sum - x_sum*x_sum;
-      scaling_ = (samples_.size()*xy_sum - x_sum*y_sum) / d;
-      offset_ = (y_sum - scaling_*x_sum) / samples_.size();
-      ROS_INFO_STREAM("depth_real = " << scaling_ << " * depth + " << offset_);
-    }
-    // create the canvas image
-    bool copy_data = false;
-    cv::Mat_<unsigned char> sample_bin_image(sample_bins_, copy_data);
-    sample_bin_image.reshape(0, 1);
-    if (show_image_)
-    {
-      cv::imshow(WINDOW_NAME, sample_bin_image);
-      cv::waitKey(5);
-    }
-  }
-
-  inline bool isFinished() const
-  {
-    return finished_;
+    */
   }
 
 private:
   ros::NodeHandle nh_;
   ros::NodeHandle nh_priv_;
-  rgbd_camera_calibration::PatternDetector* detector_;
+  rgbd_camera_calibration::CirclesGridDetector* rgb_detector_;
+  rgbd_camera_calibration::CirclesGridDetector* depth_detector_;
 
   ros::Publisher rgb_points_pub_;
   ros::Publisher depth_points_pub_;
 
-  bool has_log_;
-  std::ofstream log_;
-  double min_z_;
-  double max_z_;
-
-  image_geometry::PinholeCameraModel camera_model_;
-
-  std::vector<std::pair<double, double> > samples_;
-  std::vector<unsigned char> sample_bins_;
-
-  std::vector<cv::Point3f> corners3d_;
-  
-  bool finished_;
-
-  double scaling_;
-  double offset_;
-
-  bool show_image_;
-
+  image_geometry::PinholeCameraModel rgb_camera_model_;
+  image_geometry::PinholeCameraModel depth_camera_model_;
 };
 
 } // end of namespace
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "rgbd_depth_calibrator");
+  ros::init(argc, argv, "rgbd_camera_check");
   ros::NodeHandle n;
-  rgbd_camera_calibration::RgbdDepthCalibrator calibrator(n);
-  while (!calibrator.isFinished() && ros::ok())
-  {
-    ros::spinOnce();
-  }
+  rgbd_camera_calibration::RgbdCameraCheck check(n);
+  ros::spin();
   return 0;
 }
 

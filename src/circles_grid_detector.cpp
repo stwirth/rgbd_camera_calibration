@@ -52,11 +52,11 @@ int main(int argc, char **argv) {
 }
 
 rgbd_camera_calibration::CirclesGridDetector::CirclesGridDetector(
-    ros::NodeHandle& nh) : flags_(0)
+    ros::NodeHandle& nh) : flags_(0), reconfigure_server_(nh)
 {
-  nh.param("num_rows", num_rows_, 6);
-  nh.param("num_cols", num_cols_, 7);
-  nh.param("square_size", square_size_, 0.108);
+  nh.param("num_rows", num_rows_, 5);
+  nh.param("num_cols", num_cols_, 8);
+  nh.param("square_size", square_size_, 0.0915);
 
   /* not supported yet
   bool use_asymmetric_grid;
@@ -140,16 +140,37 @@ bool rgbd_camera_calibration::CirclesGridDetector::detect(
     std::vector<cv::Point2f>& centers) const
 {
   cv::Mat image;
-  try
+  // We want to scale floating point images so that they display nicely
+  if(image_msg->encoding.find("F") != std::string::npos)
   {
-    image = cv_bridge::toCvShare(image_msg, "mono8")->image;
+    cv::Mat float_image_bridge = cv_bridge::toCvShare(image_msg, image_msg->encoding)->image;
+    cv::Mat_<float> float_image = float_image_bridge;
+    float max_val = 0;
+    for(int i = 0; i < float_image.rows; ++i)
+    {
+      for(int j = 0; j < float_image.cols; ++j)
+      {
+        max_val = std::max(max_val, float_image(i, j));
+      }
+    }
+
+    if(max_val > 0)
+    {
+      float_image /= max_val;
+    }
+    float_image.convertTo(image, CV_8UC1, 255.0);
   }
-  catch (cv_bridge::Exception error)
+  else
   {
-    ROS_ERROR("error: %s", error.what());
-    return false;
+    try {
+      image = cv_bridge::toCvShare(image_msg, "mono8")->image;
+    }
+    catch (cv_bridge::Exception& error) {
+      ROS_ERROR("error: %s", error.what());
+      return false;
+    }
   }
-    
+
   std::vector<cv::Point2f> centers2d;
   cv::Size board_size(num_cols_, num_rows_);
   bool found = cv::findCirclesGrid(

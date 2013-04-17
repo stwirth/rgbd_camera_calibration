@@ -4,7 +4,7 @@ project(rgbd_camera_calibration)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp pcl pcl_ros image_geometry cv_bridge dynamic_reconfigure)
+find_package(catkin REQUIRED COMPONENTS roscpp pcl pcl_ros image_geometry cv_bridge dynamic_reconfigure image_transport)
 
 find_package(OpenCV REQUIRED)
 
@@ -76,16 +76,19 @@ target_link_libraries(pattern_detection
 add_dependencies(pattern_detection rgbd_camera_calibration_gencfg) 
 
 add_executable(rgbd_depth_calibrator src/rgbd_depth_calibrator.cpp)
-
-## Add cmake target dependencies of the executable/library
-## as an example, message headers may need to be generated before nodes
-# add_dependencies(rgbd_camera_calibration_node rgbd_camera_calibration_generate_messages_cpp)
-
 target_link_libraries(rgbd_depth_calibrator
   pattern_detection
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )
+
+add_executable(rgbd_camera_check src/rgbd_camera_check.cpp)
+target_link_libraries(rgbd_camera_check
+  pattern_detection
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
 
 #############
 ## Install ##

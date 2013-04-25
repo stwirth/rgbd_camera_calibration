@@ -79,7 +79,7 @@ public:
       log_ << "# rgb_z depth_z" << std::endl;
     }
 
-    nh_priv_.param("min_z", min_z_, 0.0);
+    nh_priv_.param("min_z", min_z_, 0.4);
     nh_priv_.param("max_z", max_z_, 3.5);
     int num_samples;
     nh_priv_.param("num_samples", num_samples, 100);
